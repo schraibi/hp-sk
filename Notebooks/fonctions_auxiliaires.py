@@ -1,8 +1,9 @@
-import re
+from __future__ import print_function
 import time
 from sklearn.metrics import confusion_matrix
 from hpsklearn import demo_support, components
 import matplotlib.pyplot as plt
+import sys
 
 list_classifier = [ 'svc', 'knn', 'random_forest', 'extra_trees', 'ada_boost', 'gradient_boosting', 'sgd']
 list_preprocessor =['pca', 'standard_scaler', 'min_max_scaler', 'normalizer', 'None']
@@ -14,22 +15,36 @@ def time_retriever(estimator):
     
     for i in range(len(classifier_values)):
         book_time = classifier_values[i]['book_time']
-        timestamp['i'] = time.mktime(book_time.timetuple())
+        timestamp[i] = time.mktime(book_time.timetuple())
   
     return timestamp
 
 ####    
 
-def predict_intermediate(classifiers, X_test):
-    estim = estimator.hyperopt_estimator(classifier = classfiers)
+def fit_intermediate(estimator, X_train, y_train, X_test, y_test):
+   
+    predictions = []
+    accuracies = []
+    iterator = estimator.fit_iter(X_train, y_train)
+    next(iterator)
 
-    for i in range(classifiers.shape[0]):
-        clf = classifiers[i][0]
-        param = np.array(classifiers[i][1])
-        estim = estimator.hyperopt_estimator(clf = clf(param),trial_timeout=60)
-        y[i] = estim.predict(X_test)
+    n_trial = 0
+    while len(estimator.trials.trials) < estimator.max_evals:
+        iterator.send(1)  # -- try one more model
+        n_trial += 1
+        print('Trial', n_trial, 'loss:', estimator.trials.losses()[-1], file=sys.stderr)
+        # hpsklearn.demo_support.scatter_error_vs_time(estimator)
+        # hpsklearn.demo_support.bar_classifier_choice(estimator)
+        estimator.retrain_best_model_on_full_data(X_train, y_train)
+        predictions.append(estimator.predict(X_test))
+        accuracies.append(estimator.score(X_test, y_test))
+    # /END Demo version of `estimator.fit()`
 
-    return(y)
+    print('Test accuracy:', estimator.score(X_test, y_test), file=sys.stderr)
+    print('Predict:', estimator.predict(X_test), file=sys.stderr)
+    print('Best Model:', estimator.best_model(), file=sys.stderr)
+    print('====End of demo====', file=sys.stderr)
+    return predictions, accuracies
 
 ####
 
@@ -52,6 +67,6 @@ def plot_perf(estimator):
 
     ax= fig.add_subplot(111)
     demo_support.scatter_error_vs_time(estimator, ax)
-    ax2 = fig.add_subplot(222)
-    return demo_support.plot_minvalid_vs_time(estimator, ax2)
+    ax2 = fig.add_subplot(111)
+    demo_support.plot_minvalid_vs_time(estimator, ax2)
   
